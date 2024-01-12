@@ -62,6 +62,7 @@ public class YcsbBenchClient extends DB {
     public static final String OB_TABLE_INSERT_PATITION                = "obkv.insert_partition";
     public static final String OB_TABLE_READ_FILED_SIZE                = "obkv.read_field_size";
     public static final String OB_TABLE_IS_TEST_300COL                 = "obkv.is_test_300col";
+    public static final String OB_TABLE_NEED_CHECK_RES                 = "obkv.need_check_res";
 
     // odp mode
     public boolean             isOdpMode                               = true;
@@ -123,6 +124,7 @@ public class YcsbBenchClient extends DB {
     int                        read_field_size;
 
     boolean                    is_test_300col                          = false;
+    boolean                    need_check_res                          = true;
 
     /**
      * Init.
@@ -325,6 +327,11 @@ public class YcsbBenchClient extends DB {
                 this.is_test_300col = Boolean.parseBoolean(isTest300Col);
             }
 
+            String needCheckResStr = props.getProperty(OB_TABLE_NEED_CHECK_RES);
+            if (needCheckResStr != null) {
+                this.need_check_res = Boolean.parseBoolean(needCheckResStr);
+            }
+
             obTableClient.init();
             this.obTableClient = obTableClient;
         } catch (Exception e) {
@@ -434,7 +441,11 @@ public class YcsbBenchClient extends DB {
 
                 batchOperation.addOperation(query);
             }
-            batchOperation.setIsAtomic(true).execute();
+
+            BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+            if (this.need_check_res) {
+                return result.getWrongCount() != 0 ? Status.NOT_FOUND : Status.OK;
+            }
 
             return Status.OK;
         } catch (Exception e) {
@@ -475,7 +486,11 @@ public class YcsbBenchClient extends DB {
 
                 batchOperation.addOperation(query);
             }
-            batchOperation.setIsAtomic(true).execute();
+
+            BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+            if (this.need_check_res) {
+                return result.getWrongCount() != 0 ? Status.NOT_FOUND : Status.OK;
+            }
 
             return Status.OK;
         } catch (Exception e) {
@@ -579,10 +594,11 @@ public class YcsbBenchClient extends DB {
     public Status multiInsert10Col(String table, String key, HashMap<String, ByteIterator> values)
                                                                                                   throws Exception {
         Map<String, String> vs = StringByteIterator.getStringMap(values);
-        ColumnValue[] columnValuesArray = new ColumnValue[values.size()];
+
+        List<ColumnValue> columnValueList = new ArrayList<>(vs.size());
         int i = 0;
         for (Map.Entry<String, String> entry : vs.entrySet()) {
-            columnValuesArray[i] = new ColumnValue(entry.getKey(), entry.getValue());
+            columnValueList.add(new ColumnValue(entry.getKey(), entry.getValue()));
         }
 
         int patition_key = this.patition_key;
@@ -600,7 +616,7 @@ public class YcsbBenchClient extends DB {
                 key + String.valueOf(idx)));
 
             InsertOrUpdate putOp = insertOrUpdate().setRowKey(rowKey);
-            putOp.addMutateColVal(columnValuesArray);
+            putOp.addMutateColVal(columnValueList.toArray(new ColumnValue[0]));
 
             batchOperation.addOperation(putOp);
         }
