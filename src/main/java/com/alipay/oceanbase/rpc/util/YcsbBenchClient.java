@@ -338,7 +338,6 @@ public class YcsbBenchClient extends DB {
     @Override
     public Status read(String table, String key, Set<String> fields,
                        HashMap<String, ByteIterator> result) {
-
         try {
             // 测试读 300 列
             if (this.is_test_300col && this.batchSize != 1) {
@@ -423,8 +422,7 @@ public class YcsbBenchClient extends DB {
             obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
 
             // 当设置setSamePropertiesNames(true)时，表中所有的列都必须填充值
-            BatchOperation batchOperation = obTableClient.batchOperation(tableName).setIsAtomic(
-                true);
+            BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(true);
             obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
 
             for (long i = 0; i < batchSize; i++) {
@@ -465,8 +463,7 @@ public class YcsbBenchClient extends DB {
             obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
 
             // 当设置setSamePropertiesNames(true)时，表中所有的列都必须填充值
-            BatchOperation batchOperation = obTableClient.batchOperation(tableName).setIsAtomic(
-                true);
+            BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(true);
             obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
 
             for (long i = 0; i < batchSize; i++) {
@@ -579,8 +576,8 @@ public class YcsbBenchClient extends DB {
         return Status.ERROR;
     }
 
-    public Status multiInsert10Col(String tableName, String key,
-                                   HashMap<String, ByteIterator> values) throws Exception {
+    public Status multiInsert10Col(String table, String key, HashMap<String, ByteIterator> values)
+                                                                                                  throws Exception {
         Map<String, String> vs = StringByteIterator.getStringMap(values);
         ColumnValue[] columnValuesArray = new ColumnValue[values.size()];
         int i = 0;
@@ -595,8 +592,8 @@ public class YcsbBenchClient extends DB {
             patition_key = random.nextInt(4) + 1;
         }
 
-        BatchOperation batchOperation = obTableClient.batchOperation(tableName).setIsAtomic(true);
-        obTableClient.addRowKeyElement(tableName, new String[] { "id", "ycsb_key" });
+        BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(true);
+        obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
 
         for (long idx = 0; idx < batchSize; idx++) {
             Row rowKey = new Row(colVal("id", patition_key), colVal("ycsb_key",
@@ -650,11 +647,11 @@ public class YcsbBenchClient extends DB {
         obTableClient.addRowKeyElement(table, new String[]{"id", "ycsb_key"});
 
         if (useInsertUp) {
-            InsertOrUpdate putOp = obTableClient.insertOrUpdate(tableName).setRowKey(rowKey);
+            InsertOrUpdate putOp = obTableClient.insertOrUpdate(table).setRowKey(rowKey);
             putOp.addMutateColVal(columnValueList.toArray(new ColumnValue[0]));
             putOp.execute();
         } else {
-            Insert putOp = obTableClient.insert(tableName).setRowKey(rowKey);
+            Insert putOp = obTableClient.insert(table).setRowKey(rowKey);
             putOp.addMutateColVal(columnValueList.toArray(new ColumnValue[0]));
             putOp.execute();
         }
@@ -662,7 +659,7 @@ public class YcsbBenchClient extends DB {
         return Status.OK;
     }
 
-    public Status multiInsert300Col(String tableName, String key) throws Exception {
+    public Status multiInsert300Col(String table, String key) throws Exception {
         int patition_key = this.patition_key;
         if (patition_key == -1) {
             Random random = new Random();
@@ -696,8 +693,8 @@ public class YcsbBenchClient extends DB {
         ColumnValue[] columnValueArray =  columnValueList.toArray(new ColumnValue[0]);
 
 
-        BatchOperation batchOperation = obTableClient.batchOperation(tableName).setIsAtomic(true);
-        obTableClient.addRowKeyElement(tableName, new String[]{"id", "ycsb_key"});
+        BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(true);
+        obTableClient.addRowKeyElement(table, new String[]{"id", "ycsb_key"});
 
         for (long idx = 0; idx < batchSize; idx++) {
             Row rowKey = new Row(colVal("id", patition_key), colVal("ycsb_key",
@@ -713,7 +710,7 @@ public class YcsbBenchClient extends DB {
         return Status.OK;
     }
 
-    //    public Status BatchPut300Row(String tableName, String key) throws Exception {
+    //    public Status BatchPut300Row(String table, String key) throws Exception {
     //        // 创建一个随机数生成器对象
     //        Random random = new Random();
     //
@@ -721,7 +718,7 @@ public class YcsbBenchClient extends DB {
     //        long patition_key = random.nextInt(4) + 1;
     //
     //        // 当设置setSamePropertiesNames(true)时，表中所有的列都必须填充值
-    //        BatchOperation batchOperation = obTableClient.batchOperation(tableName).setIsAtomic(true)
+    //        BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(true)
     //                .setSamePropertiesNames(true);
     //
     //        for (long i = 0; i < batchSize; i++) {
