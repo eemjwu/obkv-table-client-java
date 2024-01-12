@@ -417,7 +417,7 @@ public class YcsbBenchClient extends DB {
             int patition_key = this.patition_key;
             if (patition_key == -1) {
                 Random random = new Random();
-                patition_key = random.nextInt(4);
+                patition_key = random.nextInt(4) + 1;
             }
 
             obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
@@ -459,7 +459,7 @@ public class YcsbBenchClient extends DB {
             int patition_key = this.patition_key;
             if (patition_key == -1) {
                 Random random = new Random();
-                patition_key = random.nextInt(4);
+                patition_key = random.nextInt(4) + 1;
             }
 
             obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
@@ -559,7 +559,7 @@ public class YcsbBenchClient extends DB {
             int patition_key = this.patition_key;
             if (patition_key == -1) {
                 Random random = new Random();
-                patition_key = random.nextInt(4);
+                patition_key = random.nextInt(4) + 1;
             }
 
             obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
@@ -618,7 +618,7 @@ public class YcsbBenchClient extends DB {
         int patition_key = this.patition_key;
         if (patition_key == -1) {
             Random random = new Random();
-            patition_key = random.nextInt(4);
+            patition_key = random.nextInt(4) + 1;
         }
 
         //清除毫秒部分，仅保留到秒
@@ -718,7 +718,7 @@ public class YcsbBenchClient extends DB {
     //        Random random = new Random();
     //
     //        // 生成0到4之间的随机数
-    //        long patition_key = random.nextInt(4);
+    //        long patition_key = random.nextInt(4) + 1;
     //
     //        // 当设置setSamePropertiesNames(true)时，表中所有的列都必须填充值
     //        BatchOperation batchOperation = obTableClient.batchOperation(tableName).setIsAtomic(true)
