@@ -140,6 +140,14 @@
         </dependency>
 
         <dependency>
+            <groupId>com.yahoo.ycsb</groupId>
+            <artifactId>core</artifactId>
+            <version>0.12.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/core-0.12.0.jar</systemPath>
+        </dependency>
+
+        <dependency>
             <groupId>org.powermock</groupId>
             <artifactId>powermock-api-mockito2</artifactId>
             <version>2.0.9</version>
@@ -331,6 +339,15 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
                 <version>2.9.1</version>
+            </plugin>
+            <!-- maven-checkstyle-plugin后 -->
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <configuration>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
             </plugin>
         </plugins>
     </build>
