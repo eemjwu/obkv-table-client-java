@@ -444,7 +444,14 @@ public class YcsbBenchClient extends DB {
 
             BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
             if (this.need_check_res) {
-                return result.getWrongCount() != 0 ? Status.NOT_FOUND : Status.OK;
+                boolean all_succ = true;
+                for (int i = 0; i < result.size(); i++) {
+                    if (result.get(i).getOperationRow().get(fs.get(0)) == null) {
+                        all_succ = false;
+                        break;
+                    }
+                }
+                return !all_succ ? Status.NOT_FOUND : Status.OK;
             }
 
             return Status.OK;
