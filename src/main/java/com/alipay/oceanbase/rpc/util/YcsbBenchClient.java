@@ -60,9 +60,12 @@ public class YcsbBenchClient extends DB {
     public static final String OB_TABLE_CLIENT_LOGGING_LEVEL           = "obkv.loggingLevel";
     public static final String OB_TABLE_BATCH_SIZE                     = "obkv.batch_size";
     public static final String OB_TABLE_INSERT_PATITION                = "obkv.insert_partition";
+    public static final String OB_TABLE_PATITION_NUM                   = "obkv.partition_num";
+
     public static final String OB_TABLE_READ_FILED_SIZE                = "obkv.read_field_size";
     public static final String OB_TABLE_IS_TEST_300COL                 = "obkv.is_test_300col";
     public static final String OB_TABLE_NEED_CHECK_RES                 = "obkv.need_check_res";
+    public static final String OB_FIXPARTITIONINREQ                    = "obkv.fix_partition_in_req";
 
     // odp mode
     public boolean             isOdpMode                               = true;
@@ -120,6 +123,8 @@ public class YcsbBenchClient extends DB {
     boolean                    useRowKeyPrefix                         = false;
     int                        batchSize;
     int                        patition_key;                                                         // -1 not have patition; 0 random patiron; >0 set partiton
+    int                        patition_num;
+    boolean                    fix_patition_req                        = false;
 
     int                        read_field_size;
 
@@ -307,10 +312,21 @@ public class YcsbBenchClient extends DB {
             this.patition_key = -1;
             String partitionStr = props.getProperty(OB_TABLE_INSERT_PATITION);
             if (partitionStr == null) {
-                System.out.println("use default partitionStr: -2, not have partition");
+                System.out.println("use default partitionStr: -1, not have partition");
             } else {
                 System.out.println("partitionStr is: " + partitionStr);
                 this.patition_key = Integer.parseInt(partitionStr);
+            }
+
+            this.patition_num = 1;
+            String partitionNumStr = props.getProperty(OB_TABLE_PATITION_NUM);
+            if (partitionNumStr == null) {
+                if (this.patition_key >= 0) {
+                    throw new DBException("patition_key >= 0 but not point partition_num!");
+                }
+            } else {
+                System.out.println("partitionNumStr is: " + partitionNumStr);
+                this.patition_num = Integer.parseInt(partitionNumStr);
             }
 
             this.read_field_size = -1;
@@ -330,6 +346,11 @@ public class YcsbBenchClient extends DB {
             String needCheckResStr = props.getProperty(OB_TABLE_NEED_CHECK_RES);
             if (needCheckResStr != null) {
                 this.need_check_res = Boolean.parseBoolean(needCheckResStr);
+            }
+
+            String fixPatitionReqStr = props.getProperty(OB_FIXPARTITIONINREQ);
+            if (fixPatitionReqStr != null) {
+                this.fix_patition_req = Boolean.parseBoolean(fixPatitionReqStr);
             }
 
             obTableClient.init();
@@ -367,7 +388,7 @@ public class YcsbBenchClient extends DB {
             int patition_key = this.patition_key;
             if (patition_key == 0) {
                 Random random = new Random();
-                patition_key = random.nextInt(4) + 1;
+                patition_key = random.nextInt(this.patition_num) + 1;
             } else if (patition_key < 0) {
                 has_patition_key = false;
             }
@@ -379,6 +400,7 @@ public class YcsbBenchClient extends DB {
                         new Object[] { patition_key, key }, fs.toArray(new String[0]));
 
                 return res.isEmpty() ? Status.NOT_FOUND : Status.OK;
+
             } else {
                 obTableClient.addRowKeyElement(table, new String[] { "ycsb_key" });
 
@@ -409,7 +431,7 @@ public class YcsbBenchClient extends DB {
             int patition_key = this.patition_key;
             if (patition_key == 0) {
                 Random random = new Random();
-                patition_key = random.nextInt(4) + 1;
+                patition_key = random.nextInt(this.patition_num) + 1;
             } else if (patition_key < 0) {
                 has_patition_key = false;
             }
@@ -449,36 +471,47 @@ public class YcsbBenchClient extends DB {
             int patition_key = this.patition_key;
             if (patition_key == 0) {
                 Random random = new Random();
-                patition_key = random.nextInt(4) + 1;
+                patition_key = random.nextInt(this.patition_num) + 1;
             } else if (patition_key < 0) {
                 has_patition_key = false;
             }
             if (has_patition_key) {
-                obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
-
                 // 当设置setSamePropertiesNames(true)时，表中所有的列都必须填充值
-                BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(
-                        true);
+                BatchOperation batchOperation = obTableClient.batchOperation(table);
                 obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
+                if (this.fix_patition_req) {
+                    // key: userxxxx
+                    int key_num_size = key.length() - 4;
+                    for (long i = 0; i < batchSize; i++) {
+                        int random_num = key.charAt((int) (4 + i % key_num_size)) - '0';
+                        patition_key = this.patition_num + random_num;
+                        Row rowKey = new Row(colVal("id", patition_key), colVal("ycsb_key",
+                                key + String.valueOf(i)));
 
-                for (long i = 0; i < batchSize; i++) {
-                    // 清除毫秒部分，仅保留到秒
-                    Row rowKey = new Row(colVal("id", patition_key), colVal("ycsb_key",
-                            key + String.valueOf(i)));
+                        TableQuery query = query().setRowKey(rowKey).select(
+                                fs.toArray(new String[0]));
 
-                    TableQuery query = query().setRowKey(rowKey).select(fs.toArray(new String[0]));
+                        batchOperation.addOperation(query);
+                    }
+                } else {
+                    for (long i = 0; i < batchSize; i++) {
+                        // 清除毫秒部分，仅保留到秒
+                        Row rowKey = new Row(colVal("id", patition_key), colVal("ycsb_key",
+                                key + String.valueOf(i)));
 
-                    batchOperation.addOperation(query);
+                        TableQuery query = query().setRowKey(rowKey).select(
+                                fs.toArray(new String[0]));
+
+                        batchOperation.addOperation(query);
+                    }
                 }
-
-                BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+                BatchOperationResult result = batchOperation.execute();
                 if (this.need_check_res) {
                     return check_res(result, fs.get(0));
                 }
             } else {
                 // 当设置setSamePropertiesNames(true)时，表中所有的列都必须填充值
-                BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(
-                        true);
+                BatchOperation batchOperation = obTableClient.batchOperation(table);
                 obTableClient.addRowKeyElement(table, new String[] { "ycsb_key" });
 
                 for (long i = 0; i < batchSize; i++) {
@@ -490,7 +523,7 @@ public class YcsbBenchClient extends DB {
                     batchOperation.addOperation(query);
                 }
 
-                BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+                BatchOperationResult result = batchOperation.execute();
                 if (this.need_check_res) {
                     return check_res(result, fs.get(0));
                 }
@@ -518,7 +551,7 @@ public class YcsbBenchClient extends DB {
             int patition_key = this.patition_key;
             if (patition_key == 0) {
                 Random random = new Random();
-                patition_key = random.nextInt(4) + 1;
+                patition_key = random.nextInt(this.patition_num) + 1;
             } else if (patition_key < 0) {
                 has_patition_key = false;
             }
@@ -527,8 +560,7 @@ public class YcsbBenchClient extends DB {
                 obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
 
                 // 当设置setSamePropertiesNames(true)时，表中所有的列都必须填充值
-                BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(
-                        true);
+                BatchOperation batchOperation = obTableClient.batchOperation(table);
                 obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
 
                 for (long i = 0; i < batchSize; i++) {
@@ -541,14 +573,13 @@ public class YcsbBenchClient extends DB {
                     batchOperation.addOperation(query);
                 }
 
-                BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+                BatchOperationResult result = batchOperation.execute();
                 if (this.need_check_res) {
                     return check_res(result, fs.get(0));
                 }
             } else {
                 // 当设置setSamePropertiesNames(true)时，表中所有的列都必须填充值
-                BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(
-                        true);
+                BatchOperation batchOperation = obTableClient.batchOperation(table);
                 obTableClient.addRowKeyElement(table, new String[] { "ycsb_key" });
 
                 for (long i = 0; i < batchSize; i++) {
@@ -560,7 +591,7 @@ public class YcsbBenchClient extends DB {
                     batchOperation.addOperation(query);
                 }
 
-                BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+                BatchOperationResult result = batchOperation.execute();
                 if (this.need_check_res) {
                     return check_res(result, fs.get(0));
                 }
@@ -646,7 +677,7 @@ public class YcsbBenchClient extends DB {
             int patition_key = this.patition_key;
             if (patition_key == 0) {
                 Random random = new Random();
-                patition_key = random.nextInt(4) + 1;
+                patition_key = random.nextInt(this.patition_num) + 1;
             } else if (patition_key < 0) {
                 has_patition_key = false;
             }
@@ -692,35 +723,59 @@ public class YcsbBenchClient extends DB {
         int patition_key = this.patition_key;
         if (patition_key == 0) {
             Random random = new Random();
-            patition_key = random.nextInt(4) + 1;
+            patition_key = random.nextInt(this.patition_num) + 1;
         } else if (patition_key < 0) {
             has_patition_key = false;
         }
 
         if (has_patition_key) {
-            BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(true);
+            BatchOperation batchOperation = obTableClient.batchOperation(table);
             obTableClient.addRowKeyElement(table, new String[] { "id", "ycsb_key" });
+            if (this.fix_patition_req) {
+                // key: userxxxx
+                int key_num_size = key.length() - 4;
+                for (long idx = 0; idx < batchSize; idx++) {
+                    int random_num =  key.charAt((int) (4 + idx % key_num_size)) - '0';
+                    patition_key = this.patition_num + random_num;
+                    Row rowKey = new Row(colVal("id", patition_key), colVal("ycsb_key",
+                            key + String.valueOf(idx)));
 
-            for (long idx = 0; idx < batchSize; idx++) {
-                Row rowKey = new Row(colVal("id", patition_key), colVal("ycsb_key",
-                        key + String.valueOf(idx)));
+                    if (useInsertUp) {
+                        InsertOrUpdate putOp = insertOrUpdate().setRowKey(rowKey);
+                        putOp.addMutateColVal(columnValueList.toArray(new ColumnValue[0]));
 
-                if (useInsertUp) {
-                    InsertOrUpdate putOp = insertOrUpdate().setRowKey(rowKey);
-                    putOp.addMutateColVal(columnValueList.toArray(new ColumnValue[0]));
+                        batchOperation.addOperation(putOp);
+                    } else {
+                        Insert insertOp = MutationFactory.insert().setRowKey(rowKey);
+                        insertOp.addMutateColVal(columnValueList.toArray(new ColumnValue[0]));
 
-                    batchOperation.addOperation(putOp);
-                } else {
-                    Insert insertOp = MutationFactory.insert().setRowKey(rowKey);
-                    insertOp.addMutateColVal(columnValueList.toArray(new ColumnValue[0]));
+                        batchOperation.addOperation(insertOp);
+                    }
 
-                    batchOperation.addOperation(insertOp);
                 }
+            } else {
+                for (long idx = 0; idx < batchSize; idx++) {
+                    Row rowKey = new Row(colVal("id", patition_key), colVal("ycsb_key",
+                            key + String.valueOf(idx)));
 
+                    if (useInsertUp) {
+                        InsertOrUpdate putOp = insertOrUpdate().setRowKey(rowKey);
+                        putOp.addMutateColVal(columnValueList.toArray(new ColumnValue[0]));
+
+                        batchOperation.addOperation(putOp);
+                    } else {
+                        Insert insertOp = MutationFactory.insert().setRowKey(rowKey);
+                        insertOp.addMutateColVal(columnValueList.toArray(new ColumnValue[0]));
+
+                        batchOperation.addOperation(insertOp);
+                    }
+
+                }
             }
-            BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+            BatchOperationResult result = batchOperation.execute();
+
         } else {
-            BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(true);
+            BatchOperation batchOperation = obTableClient.batchOperation(table);
             obTableClient.addRowKeyElement(table, new String[] {"ycsb_key" });
 
             for (long idx = 0; idx < batchSize; idx++) {
@@ -739,7 +794,7 @@ public class YcsbBenchClient extends DB {
                 }
 
             }
-            BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+            BatchOperationResult result = batchOperation.execute();
         }
 
 
@@ -754,7 +809,7 @@ public class YcsbBenchClient extends DB {
         int patition_key = this.patition_key;
         if (patition_key == 0) {
             Random random = new Random();
-            patition_key = random.nextInt(4) + 1;
+            patition_key = random.nextInt(this.patition_num) + 1;
         } else if (patition_key < 0) {
             has_patition_key = false;
         }
@@ -823,7 +878,7 @@ public class YcsbBenchClient extends DB {
         int patition_key = this.patition_key;
         if (patition_key == 0) {
             Random random = new Random();
-            patition_key = random.nextInt(4) + 1;
+            patition_key = random.nextInt(this.patition_num) + 1;
         } else if (patition_key < 0) {
             has_patition_key = false;
         }
@@ -854,7 +909,7 @@ public class YcsbBenchClient extends DB {
         ColumnValue[] columnValueArray =  columnValueList.toArray(new ColumnValue[0]);
 
         if(has_patition_key) {
-            BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(true);
+            BatchOperation batchOperation = obTableClient.batchOperation(table);
             obTableClient.addRowKeyElement(table, new String[]{"id", "ycsb_key"});
 
             for (long idx = 0; idx < batchSize; idx++) {
@@ -874,9 +929,9 @@ public class YcsbBenchClient extends DB {
                 }
 
             }
-            BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+            BatchOperationResult result = batchOperation.execute();
         } else {
-            BatchOperation batchOperation = obTableClient.batchOperation(table).setIsAtomic(true);
+            BatchOperation batchOperation = obTableClient.batchOperation(table);
             obTableClient.addRowKeyElement(table, new String[]{"ycsb_key"});
 
             for (long idx = 0; idx < batchSize; idx++) {
@@ -895,7 +950,7 @@ public class YcsbBenchClient extends DB {
                 }
 
             }
-            BatchOperationResult result = batchOperation.setIsAtomic(true).execute();
+            BatchOperationResult result = batchOperation.execute();
         }
 
 
