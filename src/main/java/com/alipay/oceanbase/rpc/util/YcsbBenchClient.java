@@ -66,6 +66,7 @@ public class YcsbBenchClient extends DB {
     public static final String OB_TABLE_IS_TEST_300COL                 = "obkv.is_test_300col";
     public static final String OB_TABLE_NEED_CHECK_RES                 = "obkv.need_check_res";
     public static final String OB_FIXPARTITIONINREQ                    = "obkv.fix_partition_in_req";
+    public static final String OB_BATCH_ATOMIC                         = "obkv.batch_atomic";
 
     // odp mode
     public boolean             isOdpMode                               = true;
@@ -130,6 +131,7 @@ public class YcsbBenchClient extends DB {
 
     boolean                    is_test_300col                          = false;
     boolean                    need_check_res                          = true;
+    boolean                    batch_atomic                            = true;
 
     /**
      * Init.
@@ -348,6 +350,12 @@ public class YcsbBenchClient extends DB {
                 this.need_check_res = Boolean.parseBoolean(needCheckResStr);
             }
 
+            String batchAtomicStr = props.getProperty(OB_BATCH_ATOMIC);
+            if (batchAtomicStr != null) {
+                this.batch_atomic = Boolean.parseBoolean(batchAtomicStr);
+            }
+            System.out.println("batchAtomic is: " + this.batch_atomic);
+
             String fixPatitionReqStr = props.getProperty(OB_FIXPARTITIONINREQ);
             if (fixPatitionReqStr != null) {
                 this.fix_patition_req = Boolean.parseBoolean(fixPatitionReqStr);
@@ -505,7 +513,8 @@ public class YcsbBenchClient extends DB {
                         batchOperation.addOperation(query);
                     }
                 }
-                BatchOperationResult result = batchOperation.execute();
+                BatchOperationResult result = batchOperation.setIsAtomic(this.batch_atomic)
+                        .execute();
                 if (this.need_check_res) {
                     return check_res(result, fs.get(0));
                 }
@@ -523,7 +532,9 @@ public class YcsbBenchClient extends DB {
                     batchOperation.addOperation(query);
                 }
 
-                BatchOperationResult result = batchOperation.execute();
+                BatchOperationResult result = batchOperation.setIsAtomic(this.batch_atomic)
+                        .execute();
+                ;
                 if (this.need_check_res) {
                     return check_res(result, fs.get(0));
                 }
@@ -573,7 +584,9 @@ public class YcsbBenchClient extends DB {
                     batchOperation.addOperation(query);
                 }
 
-                BatchOperationResult result = batchOperation.execute();
+                BatchOperationResult result = batchOperation.setIsAtomic(this.batch_atomic)
+                        .execute();
+                ;
                 if (this.need_check_res) {
                     return check_res(result, fs.get(0));
                 }
@@ -591,7 +604,9 @@ public class YcsbBenchClient extends DB {
                     batchOperation.addOperation(query);
                 }
 
-                BatchOperationResult result = batchOperation.execute();
+                BatchOperationResult result = batchOperation.setIsAtomic(this.batch_atomic)
+                        .execute();
+                ;
                 if (this.need_check_res) {
                     return check_res(result, fs.get(0));
                 }
@@ -772,7 +787,7 @@ public class YcsbBenchClient extends DB {
 
                 }
             }
-            BatchOperationResult result = batchOperation.execute();
+            BatchOperationResult result = batchOperation.setIsAtomic(this.batch_atomic).execute();;
 
         } else {
             BatchOperation batchOperation = obTableClient.batchOperation(table);
@@ -794,7 +809,7 @@ public class YcsbBenchClient extends DB {
                 }
 
             }
-            BatchOperationResult result = batchOperation.execute();
+            BatchOperationResult result = batchOperation.setIsAtomic(this.batch_atomic).execute();;
         }
 
 
@@ -929,7 +944,7 @@ public class YcsbBenchClient extends DB {
                 }
 
             }
-            BatchOperationResult result = batchOperation.execute();
+            BatchOperationResult result = batchOperation.setIsAtomic(this.batch_atomic).execute();;
         } else {
             BatchOperation batchOperation = obTableClient.batchOperation(table);
             obTableClient.addRowKeyElement(table, new String[]{"ycsb_key"});
@@ -950,7 +965,7 @@ public class YcsbBenchClient extends DB {
                 }
 
             }
-            BatchOperationResult result = batchOperation.execute();
+            BatchOperationResult result = batchOperation.setIsAtomic(this.batch_atomic).execute();;
         }
 
 
